@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<products>
+  <product>
+    <sku>Sku0</sku>
+    <name>Test0</name>
+    <description>Test Description0</description>
+    <price>1.0</price>
+  </product>
+  <product>
+    <sku>Sku1</sku>
+    <name>Test1</name>
+    <description>Test Description1</description>
+    <price>1.1</price>
+  </product>
+  <product>
+    <sku>Sku2</sku>
+    <name>Test2</name>
+    <description>Test Description2</description>
+    <price>2.2</price>
+  </product>
+</products>

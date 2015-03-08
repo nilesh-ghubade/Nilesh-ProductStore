@@ -1,0 +1,348 @@
+﻿@{
+    ViewBag.Title = "Product Store";
+}
+
+
+@section scripts {
+    <style type="text/css">
+        table {
+            border: 1px solid #000;
+            border-collapse: collapse;
+            color: #666666;
+            min-width: 200px;
+        }
+
+        tr {
+            border: 1px solid #000;
+            line-height: 25px;
+        }
+
+        th {
+            background-color: #B1C3CC;
+            color: #000;
+            font-size: 13px;
+            text-align: left;
+        }
+
+        th, td {
+            padding-left: 5px;
+        }
+
+        #status {
+            color: red;
+        }
+    </style>
+
+    <script src="@Url.Content("~/Scripts/knockout-2.2.0.debug.js")" type="text/javascript"></script>
+    <script type="text/javascript">
+
+        function ViewModel() {
+
+            var self = this;
+
+            // A nested view model that represents a single product.
+            function ProductViewModel(product) {
+                var self = this;
+
+                if (product != null) {
+                    self.Sku = product.Sku;
+                    self.Name = product.Name;
+                    self.Description = product.Description;
+                    self.Price = product.Price;
+                }
+            }
+
+            self.products = ko.observableArray();   // Contains the list of products
+            self.product = ko.observable();
+
+            self.status = ko.observable();
+
+            // Get a list of all products
+            self.getAll = function () {
+
+                self.products.removeAll();
+                $.getJSON("/api/products", function (products) {
+                    $.each(products, function (index, product) {
+                        self.products.push(new ProductViewModel(product));
+                    })
+                });
+            }
+
+            // Find a product by product Sku
+            self.getBySku = function () {
+                self.status("");
+                var Sku = $('#productSku').val();
+                if (!Sku.length) {
+                    self.status("Sku is required");
+                    return;
+                }
+
+                // Send AJX request to get the product by Sku
+                $.getJSON(
+                    'api/products?sku=' + Sku,
+                    function (data) {
+                        if (data != null) {
+                            self.product(new ProductViewModel(data));
+                        }
+                        else {
+                            self.status("Not found");
+                        }
+                    })
+                    // Handler for error response:
+                    .fail(
+                        function (xhr, textStatus, err) {
+                            //self.product(null);
+                            self.status(err);
+                        });
+            }
+
+            // Update product details
+            self.update = function() {
+                self.status("");
+                var Sku = $('#productSku').val();
+                if (Sku != "") {
+                    var product = {
+                        Name: $('#name').val(),
+                        Price: $('#price').val(),
+                        Description: $('#Description').val()
+                    };
+
+                    $.ajax({
+                        url: 'api/products?sku=' + Sku,
+                        cache: false,
+                        type: 'PUT',
+                        contentType: 'application/json; charset=utf-8',
+                        data: JSON.stringify(product),
+                        success: self.getAll,
+                        statusCode: {
+                            200 /*Ok*/: function (data) {
+                                self.status("Update done.");
+                            }
+                        }
+                    })
+                    .fail(
+                    function (xhr, textStatus, err) {
+                        self.status(err);
+                    });
+                }
+            }
+
+            // Delete product details
+            self.remove = function () {                
+                self.status("");
+                var Sku = $('#productSku').val();
+
+                if (Sku != "") {
+                    var doIt = confirm("Are you sure you want to delete?");
+                    if (doIt) {
+                        $.ajax({
+                            url: 'api/products?sku=' + Sku,
+                            cache: false,
+                            type: 'DELETE',
+                            contentType: 'application/json; charset=utf-8',
+                            success: self.getAll,
+                            statusCode: {
+                                200 /*Ok*/: function (data) {
+                                    self.products.pop(data);
+                                    self.status("Delete done.");
+                                    document.getElementById("productSku").value = "";
+                                    document.getElementById("name").value = "";
+                                    document.getElementById("Description").value = "";
+                                    document.getElementById("price").value = "";
+                                }
+                            }
+                        })
+                        .fail(
+                        function (xhr, textStatus, err) {
+                            self.status(err);
+                        });
+                    }
+                }
+            }
+
+            self.create = function () {
+                self.status("");
+
+                var obj = document.getElementById("name2");
+                if (obj.value.toString().trim() == "") {
+                    self.status("Name cannot be empty.");
+                    return;
+                }
+
+                obj = document.getElementById("price2");
+                if ((isNaN(obj.value)) || (obj.value.toString().trim() == "")) {                        
+                    self.status("Price: Only numbers and decimal point allowed.");
+                    return;
+                }
+
+                var product = {
+                    Name: $('#name2').val(),
+                    Price: $('#price2').val(),
+                    Description: $('#Description2').val()
+                };
+
+                $.ajax({
+                    url: 'api/products',
+                    cache: false,
+                    type: 'POST',
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify(product),
+                    statusCode: {
+                        201 /*Created*/: function (data) {
+                            self.products.push(data);
+                            self.status("New Product added.");
+                        }
+                    }
+                })
+                .fail(
+                function (xhr, textStatus, err) {
+                    self.status(err);
+                });
+
+            }
+
+            // Initialize the view-model
+            $.getJSON("/api/products", function (products) {
+                $.each(products, function (index, product) {
+                    self.products.push(new ProductViewModel(product));
+                })
+            });
+
+        }
+
+        function clearStatus() {
+            $('#status').html('');
+        }
+
+        function add() {
+
+            clearStatus();
+
+            var product = ko.toJS(viewModel);
+            var json = JSON.stringify(product);
+
+            $.ajax({
+                url: API_URL,
+                cache: false,
+                type: 'POST',
+                contentType: 'application/json; charset=utf-8',
+                data: json,
+                statusCode: {
+                    201 /*Created*/: function (data) {
+                        self.products.push(data);
+                    }
+                }
+            });
+        }
+
+        function isNumberKey(evt) {
+            var charCode = (evt.which) ? evt.which : event.keyCode
+            
+            if (charCode > 31 && (charCode < 46 || charCode > 57))
+                return false;
+
+            return true;
+        }
+
+
+        var viewModel = new ViewModel();
+        ko.applyBindings(viewModel);
+
+        // Initialize jQuery tab widget
+        $("#tabs").tabs();
+
+    </script>
+}
+
+
+<div id="body">
+    <table>
+        <tr>
+            <td>
+                <section class="content-wrapper main-content">
+                    <h3>Products</h3>
+                    <table id="products">
+                        <thead>
+                            <tr><th>Sku</th><th>Name</th><th>Description</th><th>Price</th></tr>
+                        </thead>
+                        <tbody data-bind="foreach: products">
+                            <tr>
+                                <td data-bind="text: Sku"></td>
+                                <td data-bind="text: Name"></td>
+                                <td data-bind="text: Description"></td>
+                                <td data-bind="text: Price"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+            </td>
+            <td>
+                <section id="detail" class="content-wrapper">
+
+                    <div id="tabs">
+                        <!-- div for jQuery UI tabs -->
+                        <ul>
+                            <li><a href="#viewTab">View Product</a></li>
+                            <li><a href="#addNewTab">Add New Product</a></li>
+                        </ul>
+
+                        <div id="viewTab">
+                            <label for="productSku">Sku</label>
+                            <input type="text" title="Sku" name='Sku' id="productSku" size="5" style="background-color:lightblue" />
+                            <input type="button" value="Get" data-bind="click: getBySku" />
+
+                            <div data-bind="if: product()">
+                                <div>
+                                    <label for="name">Name</label>
+                                    <input data-bind="value: product().Name" type="text" title="Name" id="name" style="background-color:lightblue"/>
+                                </div>
+
+                                <div>
+                                    <label for="Description">Description</label>
+                                    <input data-bind="value: product().Description" type="text" title="Description" id="Description" style="background-color:lightblue" />
+                                </div>
+
+                                <div>
+                                    <label for="price">Price</label>
+                                    <input data-bind="value: product().Price" type="number" onkeypress="return isNumberKey(event)" title="Price" id="price" style="background-color:lightblue" />
+                                </div>
+
+                                <div>
+                                    <input type="button" value="Update" data-bind="click: update" />
+                                    <input type="button" value="Delete" data-bind="click: remove" />
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+
+                        <div id="addNewTab">
+                            <div>
+                                <label for="name">Name</label>
+                                <input type="text" title="Name" id="name2" style="background-color:lightblue" />
+                            </div>
+
+                            <div>
+                                <label for="Description">Description</label>
+                                <input type="text" title="Description" id="Description2" style="background-color:lightblue" />
+                            </div>
+
+                            <div>
+                                <label for="price">Price</label>
+                                <input type="number" onkeypress="return isNumberKey(event)" title="Price" id="price2" style="background-color:lightblue" />
+                            </div>
+
+                            <div>
+                                <input type="button" value="Add New" data-bind="click: create" />
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <p id="status" data-bind="text: status" />
+                    </div>
+                </section>
+            </td>
+        </tr>
+    </table>
+</div>
+
